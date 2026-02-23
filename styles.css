@@ -397,3 +397,13 @@ button {
   fill: #9ea5b5;
   font-size: 9px;
 }
+
+
+.chart-dot {
+  cursor: pointer;
+}
+
+.chart-dot.active {
+  stroke: #ffffff;
+  stroke-width: 1.2;
+}

@@ -19,7 +19,8 @@ const state = {
     range: "month",
     mode: "all",
     customStart: "",
-    customEnd: ""
+    customEnd: "",
+    selectedPointKey: ""
   },
   data: loadData()
 };
@@ -478,6 +479,13 @@ function renderProgressExerciseDetail(root) {
   const points = getExercisePoints(state.progress.selectedGroup, state.progress.selectedExercise);
   const filtered = filterPointsByCurrentProgressOptions(points);
 
+  if (!state.progress.selectedPointKey && filtered.length > 0) {
+    state.progress.selectedPointKey = pointKey(filtered[filtered.length - 1]);
+  }
+  if (filtered.length > 0 && !filtered.some((point) => pointKey(point) === state.progress.selectedPointKey)) {
+    state.progress.selectedPointKey = pointKey(filtered[filtered.length - 1]);
+  }
+
   root.innerHTML = `
     <div class="progress-head-row">
       <button id="progressBack" class="ghost">← Back</button>
@@ -502,6 +510,7 @@ function renderProgressExerciseDetail(root) {
   root.querySelector("#progressBack").addEventListener("click", () => {
     state.progress.selectedGroup = null;
     state.progress.selectedExercise = null;
+    state.progress.selectedPointKey = "";
     renderProgress();
   });
 
@@ -534,9 +543,13 @@ function renderProgressExerciseDetail(root) {
     return;
   }
 
-  const last = filtered[filtered.length - 1];
-  host.insertAdjacentHTML("beforeend", `<p class="section-subtle">Latest: ${last.reps} reps · ${last.weight} lb · ${formatDate(last.date)}</p>`);
-  host.appendChild(buildTrendChart(filtered));
+  const selectedPoint = filtered.find((point) => pointKey(point) === state.progress.selectedPointKey) || filtered[filtered.length - 1];
+  host.insertAdjacentHTML("beforeend", `<p id="progressPointSummary" class="section-subtle">${formatPointSummary(selectedPoint)}</p>`);
+  host.appendChild(buildTrendChart(filtered, state.progress.selectedPointKey, (point) => {
+    state.progress.selectedPointKey = pointKey(point);
+    const summary = root.querySelector("#progressPointSummary");
+    if (summary) summary.textContent = formatPointSummary(point);
+  }));
 }
 
 function renderChipRow(container, values, active, onClick) {
@@ -622,7 +635,7 @@ function inCurrentRange(dateId) {
   return d >= start && d <= today;
 }
 
-function buildTrendChart(points) {
+function buildTrendChart(points, selectedKey, onPointSelect) {
   const width = 360;
   const height = 260;
   const pad = 24;
@@ -645,10 +658,13 @@ function buildTrendChart(points) {
   const repPath = points.map((p, i) => `${xAt(i)},${yRep(p.reps)}`).join(" ");
   const weightPath = points.map((p, i) => `${xAt(i)},${yWeight(p.weight)}`).join(" ");
 
-  const dots = points.map((p, i) => `
-    <circle cx="${xAt(i)}" cy="${yRep(p.reps)}" r="3" fill="${REP_COLOR}"></circle>
-    <circle cx="${xAt(i)}" cy="${yWeight(p.weight)}" r="3" fill="${WEIGHT_COLOR}"></circle>
-  `).join("");
+  const dots = points.map((p, i) => {
+    const active = pointKey(p) === selectedKey;
+    return `
+      <circle data-series="rep" data-index="${i}" cx="${xAt(i)}" cy="${yRep(p.reps)}" r="${active ? 4.5 : 3}" class="chart-dot ${active ? "active" : ""}" fill="${REP_COLOR}"></circle>
+      <circle data-series="weight" data-index="${i}" cx="${xAt(i)}" cy="${yWeight(p.weight)}" r="${active ? 4.5 : 3}" class="chart-dot ${active ? "active" : ""}" fill="${WEIGHT_COLOR}"></circle>
+    `;
+  }).join("");
 
   const labels = points.map((p, i) => `<text x="${xAt(i)}" y="${height - 5}" class="chart-label">${shortDate(p.date)} · S${p.setIndex}</text>`).join("");
 
@@ -666,6 +682,23 @@ function buildTrendChart(points) {
       <text x="8" y="${height / 2 + 16}" class="chart-axis">Weight</text>
     </svg>
   `;
+
+  wrap.querySelectorAll('.chart-dot').forEach((dot) => {
+    dot.addEventListener('click', () => {
+      const point = points[Number(dot.dataset.index)];
+      onPointSelect(point);
+      wrap.querySelectorAll('.chart-dot').forEach((node) => {
+        node.classList.remove('active');
+        node.setAttribute('r', '3');
+      });
+      const pointIndex = dot.dataset.index;
+      wrap.querySelectorAll(`.chart-dot[data-index="${pointIndex}"]`).forEach((node) => {
+        node.classList.add('active');
+        node.setAttribute('r', '4.5');
+      });
+    });
+  });
+
   return wrap;
 }
 
@@ -673,6 +706,15 @@ function mapRange(value, min, max, start, end) {
   if (min === max) return (start + end) / 2;
   const ratio = (value - min) / (max - min);
   return start + ratio * (end - start);
+}
+
+
+function pointKey(point) {
+  return `${point.date}|${point.setIndex}|${point.reps}|${point.weight}`;
+}
+
+function formatPointSummary(point) {
+  return `Selected: ${point.reps} reps · ${point.weight} lb · ${formatDate(point.date)} (Set ${point.setIndex})`;
 }
 
 function shortDate(iso) {
