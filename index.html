@@ -9,63 +9,20 @@
   <body>
     <main class="app-shell">
       <header class="top-bar">
-        <button id="menuButton" class="icon-btn" aria-label="Open menu">☰</button>
-        <div class="month-nav">
-          <button id="prevMonth" class="icon-btn" aria-label="Previous month">‹</button>
-          <h1 id="monthLabel"></h1>
-          <button id="nextMonth" class="icon-btn" aria-label="Next month">›</button>
-        </div>
+        <button id="prevMonth" class="icon-btn" aria-label="Previous month">‹</button>
+        <h1 id="monthLabel"></h1>
+        <button id="nextMonth" class="icon-btn" aria-label="Next month">›</button>
       </header>
 
-      <section id="viewCalendar" class="view-section">
-        <section class="calendar-card" aria-label="Workout calendar">
-          <div class="weekday-row">
-            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-          </div>
-          <div id="calendarGrid" class="calendar-grid"></div>
-        </section>
-        <section id="dayPanel" class="day-panel" aria-live="polite"></section>
+      <section class="calendar-card" aria-label="Workout calendar">
+        <div class="weekday-row">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
       </section>
 
-      <section id="viewPRs" class="view-section hidden">
-        <div class="day-panel">
-          <h2 class="section-title">Personal Records</h2>
-          <p class="section-subtle">Best (highest weight) set logged for each exercise.</p>
-          <section id="prContainer"></section>
-        </div>
-      </section>
-
-      <section id="viewProgress" class="view-section hidden">
-        <div class="day-panel">
-          <h2 class="section-title">Progress</h2>
-          <p class="section-subtle">Simple monthly workout frequency.</p>
-          <div id="progressSummary"></div>
-        </div>
-      </section>
-
-      <section id="viewSettings" class="view-section hidden">
-        <div class="day-panel">
-          <h2 class="section-title">Settings</h2>
-          <label class="settings-row">
-            Highlight color
-            <input id="highlightColor" type="color" />
-          </label>
-          <p class="section-subtle">This changes calendar highlight and accent color.</p>
-        </div>
-      </section>
+      <section id="dayPanel" class="day-panel hidden" aria-live="polite"></section>
     </main>
-
-    <template id="menuTemplate">
-      <div class="overlay" id="menuOverlay">
-        <div class="menu-card">
-          <button data-view="calendar">Calendar</button>
-          <button data-view="settings">Settings</button>
-          <button data-view="prs">PR's</button>
-          <button data-view="progress">Progress</button>
-          <button id="closeMenu" class="ghost">Close</button>
-        </div>
-      </div>
-    </template>
 
     <template id="addExerciseTemplate">
       <div class="overlay">
