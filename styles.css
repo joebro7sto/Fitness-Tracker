@@ -249,7 +249,8 @@ button {
 
 .modal-card input,
 .modal-card select,
-.settings-row input {
+.settings-row input,
+.custom-range-row input {
   width: 100%;
   border-radius: 8px;
   border: 1px solid var(--outline);
@@ -301,4 +302,98 @@ button {
 .progress-meta {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.progress-exercise-item {
+  width: 100%;
+  text-align: left;
+  margin-top: 6px;
+  background: #111621;
+}
+
+.progress-head-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.chip {
+  background: #121722;
+  border-color: #2a3240;
+  padding: 6px 10px;
+}
+
+.chip.active {
+  background: color-mix(in srgb, var(--accent) 25%, #1a1f2a 75%);
+  border-color: var(--accent-soft);
+}
+
+.custom-range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  margin-right: 6px;
+}
+
+.dot.rep { background: #32e875; }
+.dot.weight { background: #f8be35; }
+
+.chart-wrap {
+  margin-top: 10px;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  background: #0f1218;
+  overflow-x: auto;
+}
+
+.trend-chart {
+  width: 100%;
+  min-width: 360px;
+  height: 260px;
+  display: block;
+}
+
+.chart-grid {
+  stroke: #1f2632;
+  stroke-width: 1;
+}
+
+.chart-mid {
+  stroke: #2a3240;
+  stroke-width: 1;
+}
+
+.chart-label {
+  fill: #7f8594;
+  font-size: 7px;
+  text-anchor: middle;
+}
+
+.chart-axis {
+  fill: #9ea5b5;
+  font-size: 9px;
 }

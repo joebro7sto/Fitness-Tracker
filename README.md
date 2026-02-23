@@ -10,7 +10,7 @@ Mobile-first workout logging web app with:
 - Top-left menu with sections for Settings, PR's, and Progress.
 - Settings: change highlighted day accent color.
 - PR's: per-muscle-group personal record cards showing highest weight, reps, and date.
-- Progress: monthly workout-day summary.
+- Progress: muscle group -> exercise trend charts with Week/Month/Year/Custom date ranges and All sets/Heaviest sets filters for reps and weight.
 - Persistent storage using browser `localStorage`.
 
 ## Run locally

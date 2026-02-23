@@ -4,12 +4,23 @@ const MUSCLE_GROUPS = [
 
 const STORAGE_KEY = "gym-log-v2";
 const DEFAULT_ACCENT = "#3adb7a";
+const REP_COLOR = "#32e875";
+const WEIGHT_COLOR = "#f8be35";
 
 const state = {
   activeView: "calendar",
   monthCursor: new Date(),
   selectedDate: isoDate(new Date()),
   openGroups: new Set(),
+  progressOpenGroups: new Set(),
+  progress: {
+    selectedGroup: null,
+    selectedExercise: null,
+    range: "month",
+    mode: "all",
+    customStart: "",
+    customEnd: ""
+  },
   data: loadData()
 };
 
@@ -269,12 +280,14 @@ function renderSetRow(group, exIndex, set, setIndex) {
     ensureDay(state.selectedDate).muscles[group][exIndex].sets[setIndex].reps = event.target.value;
     saveData();
     renderPRs();
+    renderProgress();
   });
 
   weightInput.addEventListener("input", (event) => {
     ensureDay(state.selectedDate).muscles[group][exIndex].sets[setIndex].weight = event.target.value;
     saveData();
     renderPRs();
+    renderProgress();
   });
 
   removeSetButton.addEventListener("click", () => {
@@ -396,34 +409,275 @@ function buildPRRecords() {
 }
 
 function renderProgress() {
-  const summary = document.getElementById("progressSummary");
-  const monthly = new Map();
+  const root = document.getElementById("progressRoot");
+  if (!state.progress.selectedGroup || !state.progress.selectedExercise) {
+    renderProgressExercisePicker(root);
+    return;
+  }
+  renderProgressExerciseDetail(root);
+}
 
-  Object.entries(state.data.workouts).forEach(([date]) => {
-    if (!hasLoggedExercise(date)) return;
-    const d = new Date(`${date}T00:00:00`);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    monthly.set(key, (monthly.get(key) || 0) + 1);
+function renderProgressExercisePicker(root) {
+  root.innerHTML = "";
+  const byGroup = getExerciseIndexByGroup();
+
+  MUSCLE_GROUPS.forEach((group) => {
+    const exercises = byGroup[group];
+    if (exercises.length === 0) return;
+
+    const section = document.createElement("article");
+    section.className = "muscle-group";
+    const isOpen = state.progressOpenGroups.has(group);
+
+    section.innerHTML = `
+      <button class="muscle-header" type="button">
+        <span>${group}</span>
+        <span>${isOpen ? "▴" : "▾"}</span>
+      </button>
+      <div class="muscle-content ${isOpen ? "" : "hidden-content"}"></div>
+    `;
+
+    const header = section.querySelector(".muscle-header");
+    const caret = header.querySelector("span:last-child");
+    const content = section.querySelector(".muscle-content");
+
+    header.addEventListener("click", () => {
+      const open = state.progressOpenGroups.has(group);
+      if (open) {
+        state.progressOpenGroups.delete(group);
+        caret.textContent = "▾";
+        content.classList.add("hidden-content");
+      } else {
+        state.progressOpenGroups.add(group);
+        caret.textContent = "▴";
+        content.classList.remove("hidden-content");
+      }
+    });
+
+    exercises.sort((a, b) => a.localeCompare(b)).forEach((exerciseName) => {
+      const button = document.createElement("button");
+      button.className = "progress-exercise-item";
+      button.textContent = exerciseName;
+      button.addEventListener("click", () => {
+        state.progress.selectedGroup = group;
+        state.progress.selectedExercise = exerciseName;
+        renderProgress();
+      });
+      content.appendChild(button);
+    });
+
+    root.appendChild(section);
   });
 
-  const entries = [...monthly.entries()].sort((a, b) => a[0].localeCompare(b[0])).reverse();
-  if (entries.length === 0) {
-    summary.innerHTML = '<p class="section-subtle">No workout data yet.</p>';
+  if (!root.innerHTML.trim()) {
+    root.innerHTML = '<p class="section-subtle">No exercise sets logged yet.</p>';
+  }
+}
+
+function renderProgressExerciseDetail(root) {
+  const points = getExercisePoints(state.progress.selectedGroup, state.progress.selectedExercise);
+  const filtered = filterPointsByCurrentProgressOptions(points);
+
+  root.innerHTML = `
+    <div class="progress-head-row">
+      <button id="progressBack" class="ghost">← Back</button>
+      <div>
+        <strong>${escapeHtml(state.progress.selectedExercise)}</strong>
+        <div class="progress-meta">${state.progress.selectedGroup}</div>
+      </div>
+    </div>
+    <div class="chip-row" id="rangeChips"></div>
+    <div id="customRangeRow" class="custom-range-row ${state.progress.range === "custom" ? "" : "hidden"}">
+      <label>From <input type="date" id="customStart" value="${state.progress.customStart}"></label>
+      <label>To <input type="date" id="customEnd" value="${state.progress.customEnd}"></label>
+    </div>
+    <div class="chip-row" id="modeChips"></div>
+    <div class="chart-legend">
+      <span><i class="dot rep"></i>Reps</span>
+      <span><i class="dot weight"></i>Weight (lb)</span>
+    </div>
+    <div id="chartHost"></div>
+  `;
+
+  root.querySelector("#progressBack").addEventListener("click", () => {
+    state.progress.selectedGroup = null;
+    state.progress.selectedExercise = null;
+    renderProgress();
+  });
+
+  renderChipRow(root.querySelector("#rangeChips"), ["week", "month", "year", "custom"], state.progress.range, (value) => {
+    state.progress.range = value;
+    renderProgress();
+  });
+
+  renderChipRow(root.querySelector("#modeChips"), ["all", "heaviest"], state.progress.mode, (value) => {
+    state.progress.mode = value;
+    renderProgress();
+  });
+
+  const customStart = root.querySelector("#customStart");
+  const customEnd = root.querySelector("#customEnd");
+  if (customStart && customEnd) {
+    customStart.addEventListener("change", (event) => {
+      state.progress.customStart = event.target.value;
+      renderProgress();
+    });
+    customEnd.addEventListener("change", (event) => {
+      state.progress.customEnd = event.target.value;
+      renderProgress();
+    });
+  }
+
+  const host = root.querySelector("#chartHost");
+  if (filtered.length === 0) {
+    host.innerHTML = '<p class="section-subtle">No sets available for this range.</p>';
     return;
   }
 
-  summary.innerHTML = "";
-  entries.forEach(([month, count]) => {
-    const row = document.createElement("div");
-    row.className = "progress-item";
-    row.innerHTML = `
-      <strong>${formatMonth(month)}</strong>
-      <div>${count} workout day${count === 1 ? "" : "s"}</div>
-      <div class="progress-meta">Logged days with at least one exercise</div>
-      <div class="progress-meta">${Math.min(100, count * 5)}% consistency score</div>
-    `;
-    summary.appendChild(row);
+  const last = filtered[filtered.length - 1];
+  host.insertAdjacentHTML("beforeend", `<p class="section-subtle">Latest: ${last.reps} reps · ${last.weight} lb · ${formatDate(last.date)}</p>`);
+  host.appendChild(buildTrendChart(filtered));
+}
+
+function renderChipRow(container, values, active, onClick) {
+  values.forEach((value) => {
+    const button = document.createElement("button");
+    button.className = `chip ${value === active ? "active" : ""}`;
+    button.textContent = value[0].toUpperCase() + value.slice(1);
+    button.addEventListener("click", () => onClick(value));
+    container.appendChild(button);
   });
+}
+
+function getExerciseIndexByGroup() {
+  const grouped = Object.fromEntries(MUSCLE_GROUPS.map((group) => [group, new Set()]));
+  Object.values(state.data.workouts).forEach((day) => {
+    MUSCLE_GROUPS.forEach((group) => {
+      (day.muscles[group] || []).forEach((exercise) => {
+        if (exercise.sets.some((set) => Number(set.weight) > 0 || Number(set.reps) > 0)) {
+          grouped[group].add(exercise.name);
+        }
+      });
+    });
+  });
+  return Object.fromEntries(MUSCLE_GROUPS.map((group) => [group, [...grouped[group]] ]));
+}
+
+function getExercisePoints(group, exerciseName) {
+  const points = [];
+  Object.entries(state.data.workouts)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([date, day]) => {
+      (day.muscles[group] || []).forEach((exercise) => {
+        if (exercise.name.toLowerCase() !== exerciseName.toLowerCase()) return;
+        exercise.sets.forEach((set, index) => {
+          const weight = Number(set.weight);
+          const reps = Number(set.reps);
+          if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(reps) || reps <= 0) return;
+          points.push({ date, setIndex: index + 1, reps, weight });
+        });
+      });
+    });
+  return points;
+}
+
+function filterPointsByCurrentProgressOptions(points) {
+  const rangeFiltered = points.filter((point) => inCurrentRange(point.date));
+  if (state.progress.mode === "all") return rangeFiltered;
+
+  const byDate = new Map();
+  rangeFiltered.forEach((point) => {
+    const existing = byDate.get(point.date);
+    if (!existing || point.weight > existing.weight || (point.weight === existing.weight && point.reps > existing.reps)) {
+      byDate.set(point.date, point);
+    }
+  });
+
+  return [...byDate.values()].sort((a, b) => {
+    if (a.date === b.date) return a.setIndex - b.setIndex;
+    return a.date.localeCompare(b.date);
+  });
+}
+
+function inCurrentRange(dateId) {
+  const d = new Date(`${dateId}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (state.progress.range === "custom") {
+    if (!state.progress.customStart || !state.progress.customEnd) return true;
+    const start = new Date(`${state.progress.customStart}T00:00:00`);
+    const end = new Date(`${state.progress.customEnd}T00:00:00`);
+    return d >= start && d <= end;
+  }
+
+  const start = new Date(today);
+  if (state.progress.range === "week") {
+    start.setDate(today.getDate() - 7);
+  } else if (state.progress.range === "month") {
+    start.setMonth(today.getMonth() - 1);
+  } else {
+    start.setFullYear(today.getFullYear() - 1);
+  }
+  return d >= start && d <= today;
+}
+
+function buildTrendChart(points) {
+  const width = 360;
+  const height = 260;
+  const pad = 24;
+
+  const maxRep = Math.max(...points.map((p) => p.reps));
+  const minRep = Math.min(...points.map((p) => p.reps));
+  const maxWeight = Math.max(...points.map((p) => p.weight));
+  const minWeight = Math.min(...points.map((p) => p.weight));
+
+  const xAt = (i) => (points.length === 1 ? width / 2 : pad + (i * (width - pad * 2)) / (points.length - 1));
+  const yRep = (value) => mapRange(value, minRep, maxRep, pad, height / 2 - 10);
+  const yWeight = (value) => mapRange(value, minWeight, maxWeight, height - pad, height / 2 + 14);
+
+  let grid = "";
+  for (let i = 0; i < points.length; i += 1) {
+    const x = xAt(i);
+    grid += `<line x1="${x}" y1="${pad}" x2="${x}" y2="${height - pad}" class="chart-grid"/>`;
+  }
+
+  const repPath = points.map((p, i) => `${xAt(i)},${yRep(p.reps)}`).join(" ");
+  const weightPath = points.map((p, i) => `${xAt(i)},${yWeight(p.weight)}`).join(" ");
+
+  const dots = points.map((p, i) => `
+    <circle cx="${xAt(i)}" cy="${yRep(p.reps)}" r="3" fill="${REP_COLOR}"></circle>
+    <circle cx="${xAt(i)}" cy="${yWeight(p.weight)}" r="3" fill="${WEIGHT_COLOR}"></circle>
+  `).join("");
+
+  const labels = points.map((p, i) => `<text x="${xAt(i)}" y="${height - 5}" class="chart-label">${shortDate(p.date)} · S${p.setIndex}</text>`).join("");
+
+  const wrap = document.createElement("div");
+  wrap.className = "chart-wrap";
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" class="trend-chart" role="img" aria-label="Reps and weight trend chart">
+      ${grid}
+      <line x1="${pad}" y1="${height / 2}" x2="${width - pad}" y2="${height / 2}" class="chart-mid"/>
+      <polyline points="${repPath}" fill="none" stroke="${REP_COLOR}" stroke-width="2"></polyline>
+      <polyline points="${weightPath}" fill="none" stroke="${WEIGHT_COLOR}" stroke-width="2"></polyline>
+      ${dots}
+      ${labels}
+      <text x="8" y="16" class="chart-axis">Reps</text>
+      <text x="8" y="${height / 2 + 16}" class="chart-axis">Weight</text>
+    </svg>
+  `;
+  return wrap;
+}
+
+function mapRange(value, min, max, start, end) {
+  if (min === max) return (start + end) / 2;
+  const ratio = (value - min) / (max - min);
+  return start + ratio * (end - start);
+}
+
+function shortDate(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function hasLoggedExercise(dateId) {
@@ -445,11 +699,6 @@ function ensureDay(dateId) {
 function formatDate(iso) {
   const d = new Date(`${iso}T00:00:00`);
   return d.toLocaleDateString();
-}
-
-function formatMonth(monthKey) {
-  const [year, month] = monthKey.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
 function darkenHex(hex, amount) {
