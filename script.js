@@ -646,7 +646,7 @@ function buildTrendChart(points, selectedKey, onPointSelect) {
   const minWeight = Math.min(...points.map((p) => p.weight));
 
   const xAt = (i) => (points.length === 1 ? width / 2 : pad + (i * (width - pad * 2)) / (points.length - 1));
-  const yRep = (value) => mapRange(value, minRep, maxRep, pad, height / 2 - 10);
+  const yRep = (value) => mapRange(value, minRep, maxRep, height / 2 - 10, pad);
   const yWeight = (value) => mapRange(value, minWeight, maxWeight, height - pad, height / 2 + 14);
 
   let grid = "";
